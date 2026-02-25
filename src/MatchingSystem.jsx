@@ -1,31 +1,83 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, X, RefreshCw, Star, Info } from 'lucide-react'
-import { supabase } from './supabaseClient'
-
+/**
+ * Componente que gestiona el sistema de emparejamiento (swipe cards).
+ * Permite a los usuarios ver perfiles, dar "like" o "dislike" y detectar matches.
+ * 
+ * @component
+ * @param {Object} props
+ * @param {Object} props.user - El objeto de sesión del usuario actual.
+ */
 export default function MatchingSystem({ user }) {
     const [potentialMatches, setPotentialMatches] = useState([])
     const [currentIndex, setCurrentIndex] = useState(0)
     const [matchNotification, setMatchNotification] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
-        fetchPotentialMatches()
-        subscribeToMatches()
+        init()
     }, [])
 
-    const fetchPotentialMatches = async () => {
-        setLoading(true)
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .neq('id', user.id)
-            .limit(10)
-
-        if (data) setPotentialMatches(data)
-        setLoading(false)
+    /**
+     * Inicializa el sistema cargando perfiles.
+     */
+    const init = async () => {
+        try {
+            await fetchPotentialMatches()
+            subscribeToMatches()
+        } catch (err) {
+            setError('Error al conectar con el servidor.')
+        }
     }
 
+    /**
+     * Asegura que el usuario tenga un perfil creado antes de interactuar.
+     */
+    const ensureProfileExists = async () => {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .single()
+
+        if (!profile) {
+            const username = user.email ? user.email.split('@')[0] : `user_${user.id.slice(0, 5)}`
+            const { error: createError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    username: username,
+                    bio: '¡Hola! Estoy buscando matches.'
+                })
+
+            if (createError) throw new Error('No se pudo inicializar tu perfil.')
+        }
+    }
+
+    /**
+     * Obtiene una lista de perfiles potenciales (excluyendo al usuario actual).
+     */
+    const fetchPotentialMatches = async () => {
+        setLoading(true)
+        setError(null)
+        try {
+            const { data, error: fetchError } = await supabase
+                .from('profiles')
+                .select('*')
+                .neq('id', user.id)
+                .limit(10)
+
+            if (fetchError) throw fetchError
+            if (data) setPotentialMatches(data)
+        } catch (err) {
+            setError('No se pudieron cargar los perfiles. Intenta de nuevo.')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    /**
+     * Escucha en tiempo real si el usuario recibe un match.
+     */
     const subscribeToMatches = () => {
         supabase
             .channel('my_matches')
@@ -42,34 +94,63 @@ export default function MatchingSystem({ user }) {
             .subscribe()
     }
 
+    /**
+     * Gestiona la acción de deslizar (Like/Dislike).
+     * 
+     * @param {string} direction - 'right' para Like, 'left' para Dislike.
+     * @param {string} targetUserId - ID del usuario al que se le dio swipe.
+     */
     const handleSwipe = async (direction, targetUserId) => {
-        if (direction === 'right') {
-            const { data: existingLike } = await supabase
-                .from('matches')
-                .select('*')
-                .eq('user_a', targetUserId)
-                .eq('user_b', user.id)
-                .single()
+        setError(null)
+        try {
+            // Garantizar perfil antes de swipe para evitar FK violations
+            await ensureProfileExists()
 
-            if (existingLike) {
-                await supabase
+            if (direction === 'right') {
+                const { data: existingLike } = await supabase
                     .from('matches')
-                    .update({ status: 'matched' })
-                    .eq('id', existingLike.id)
-                setMatchNotification('¡Es un Match Perfecto!')
-            } else {
-                await supabase
-                    .from('matches')
-                    .upsert({ user_a: user.id, user_b: targetUserId, status: 'pending' })
+                    .select('*')
+                    .eq('user_a', targetUserId)
+                    .eq('user_b', user.id)
+                    .single()
+
+                if (existingLike) {
+                    const { error: updError } = await supabase
+                        .from('matches')
+                        .update({ status: 'matched' })
+                        .eq('id', existingLike.id)
+
+                    if (updError) throw updError
+                    setMatchNotification('¡Es un Match Perfecto!')
+                } else {
+                    const { error: insError } = await supabase
+                        .from('matches')
+                        .upsert({ user_a: user.id, user_b: targetUserId, status: 'pending' })
+
+                    if (insError) {
+                        if (insError.code !== '23505') throw insError
+                    }
+                }
             }
+            setCurrentIndex(prev => prev + 1)
+        } catch (err) {
+            setError('No se pudo procesar la acción. Verifica tu conexión.')
         }
-        setCurrentIndex(prev => prev + 1)
     }
 
     if (loading) return (
         <div className="loading-container">
             <RefreshCw className="spinner" />
             <p>Buscando perfiles cerca de ti...</p>
+        </div>
+    )
+
+    if (error) return (
+        <div className="card error-state">
+            <AlertCircle color="#ff4d4d" size={48} />
+            <h3>Ocurrió un error</h3>
+            <p>{error}</p>
+            <button className="primary" onClick={init}>Intentar de nuevo</button>
         </div>
     )
 

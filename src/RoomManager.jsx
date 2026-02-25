@@ -3,6 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare, AlertCircle } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
+/**
+ * Componente que gestiona las salas de chat y los miembros de las mismas.
+ * Permite listar salas, crear nuevas, unirse y ver participantes en tiempo real.
+ * 
+ * @component
+ * @param {Object} props
+ * @param {Object} props.user - El objeto de sesión del usuario actual.
+ */
 export default function RoomManager({ user }) {
     const [rooms, setRooms] = useState([])
     const [newRoomName, setNewRoomName] = useState('')
@@ -25,17 +33,27 @@ export default function RoomManager({ user }) {
         return () => subscription.unsubscribe()
     }, [])
 
+    /**
+     * Obtiene todas las salas disponibles ordenadas por fecha de creación.
+     */
     const fetchRooms = async () => {
         setError(null)
-        const { data, error } = await supabase
-            .from('rooms')
-            .select('*')
-            .order('created_at', { ascending: false })
+        try {
+            const { data, error: fetchError } = await supabase
+                .from('rooms')
+                .select('*')
+                .order('created_at', { ascending: false })
 
-        if (error) setError('No se pudieron cargar las salas.')
-        if (data) setRooms(data)
+            if (fetchError) throw fetchError
+            if (data) setRooms(data)
+        } catch (err) {
+            setError('Error de conexión: No se pudieron cargar las salas.')
+        }
     }
 
+    /**
+     * Asegura que el usuario tenga un perfil antes de realizar acciones en las salas.
+     */
     const ensureProfileExists = async () => {
         const { data: profile } = await supabase
             .from('profiles')
@@ -58,29 +76,30 @@ export default function RoomManager({ user }) {
         }
     }
 
+    /**
+     * Crea una nueva sala de chat, asegurando primero la existencia del perfil del usuario.
+     */
     const createRoom = async () => {
-        if (!newRoomName) return
+        if (!newRoomName.trim()) return
         setLoading(true)
         setError(null)
 
         try {
-            // 1. Ensure profile exists to avoid FK violations
             await ensureProfileExists()
 
-            // 2. Attempt to create the room
-            const { data, error } = await supabase
+            const { data, error: createError } = await supabase
                 .from('rooms')
-                .insert([{ name: newRoomName, created_by: user.id }])
+                .insert([{ name: newRoomName.trim(), created_by: user.id }])
                 .select()
 
-            if (error) {
-                if (error.code === '23505' || error.status === 409) {
-                    throw new Error('Ya existe una sala con ese nombre. Prueba con otro.')
+            if (createError) {
+                if (createError.code === '23505' || createError.status === 409) {
+                    throw new Error('Ese nombre de sala ya está en uso. ¡Prueba algo diferente!')
                 }
-                if (error.code === '23503') {
-                    throw new Error('Error de vinculación de perfil. Por favor, recarga la página.')
+                if (createError.code === '23503') {
+                    throw new Error('Tu perfil no está sincronizado. Por favor, recarga la página.')
                 }
-                throw error
+                throw createError
             }
 
             if (data) {
@@ -94,33 +113,35 @@ export default function RoomManager({ user }) {
         }
     }
 
+    /**
+     * Asocia al usuario con una sala específica.
+     * 
+     * @param {string} roomId - ID de la sala a la que unirse.
+     */
     const joinRoom = async (roomId) => {
         setLoading(true)
         setError(null)
         try {
-            // 1. Ensure profile exists before joining
             await ensureProfileExists()
 
-            // 2. Attempt to join
-            const { error } = await supabase
+            const { error: joinError } = await supabase
                 .from('room_members')
                 .upsert({ room_id: roomId, user_id: user.id })
 
-            if (error) {
-                // Ignore unique constraint violation (already a member)
-                if (error.code === '23505') {
-                    console.log('Usuario ya es miembro de esta sala, procediendo...');
-                } else if (error.code === '23503') {
-                    throw new Error('No se pudo vincular tu perfil a la sala. Intenta recargar la página.')
+            if (joinError) {
+                if (joinError.code === '23505') {
+                    // Ya es miembro, no es un error fatal
+                } else if (joinError.code === '23503') {
+                    throw new Error('Error de perfil: Recarga la página para sincronizar.')
                 } else {
-                    throw error
+                    throw joinError
                 }
             }
 
             setCurrentRoom(roomId)
             subscribeToMembers(roomId)
         } catch (err) {
-            setError(err.message || 'Error al unirse a la sala.')
+            setError(err.message || 'Error inesperado al intentar unirse.')
         } finally {
             setLoading(false)
         }

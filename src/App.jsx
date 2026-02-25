@@ -7,6 +7,12 @@ import RoomManager from './RoomManager'
 import MatchingSystem from './MatchingSystem'
 import './App.css'
 
+/**
+ * Componente principal de la aplicación.
+ * Gestiona el estado de la sesión, la navegación por pestañas y el layout global.
+ * 
+ * @component
+ */
 function App() {
     const [session, setSession] = useState(null)
     const [activeTab, setActiveTab] = useState('rooms')

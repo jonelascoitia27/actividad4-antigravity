@@ -3,6 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, LogIn, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
+/**
+ * Componente de autenticación que gestiona el inicio de sesión y registro.
+ * Utiliza Supabase Auth para la gestión de usuarios.
+ * 
+ * @component
+ */
 export default function Auth() {
     const [loading, setLoading] = useState(false)
     const [email, setEmail] = useState('')
