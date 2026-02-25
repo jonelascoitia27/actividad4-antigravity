@@ -1,3 +1,8 @@
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Heart, X, RefreshCw, Star, Info, AlertCircle } from 'lucide-react'
+import { supabase } from './supabaseClient'
+
 /**
  * Componente que gestiona el sistema de emparejamiento (swipe cards).
  * Permite a los usuarios ver perfiles, dar "like" o "dislike" y detectar matches.
