@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
 export default function RoomManager({ user }) {
@@ -11,7 +13,6 @@ export default function RoomManager({ user }) {
     useEffect(() => {
         fetchRooms()
 
-        // Subscribe to new rooms
         const subscription = supabase
             .channel('public:rooms')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rooms' }, payload => {
@@ -23,7 +24,7 @@ export default function RoomManager({ user }) {
     }, [])
 
     const fetchRooms = async () => {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('rooms')
             .select('*')
             .order('created_at', { ascending: false })
@@ -39,9 +40,7 @@ export default function RoomManager({ user }) {
             .insert([{ name: newRoomName, created_by: user.id }])
             .select()
 
-        if (error) {
-            console.error('Error creating room:', error)
-        } else {
+        if (!error && data) {
             setNewRoomName('')
             joinRoom(data[0].id)
         }
@@ -74,7 +73,6 @@ export default function RoomManager({ user }) {
                 table: 'room_members',
                 filter: `room_id=eq.${roomId}`
             }, () => {
-                // Refresh members
                 supabase
                     .from('room_members')
                     .select('user_id')
@@ -84,46 +82,123 @@ export default function RoomManager({ user }) {
             .subscribe()
     }
 
-    if (currentRoom) {
-        return (
-            <div className="card room-detail">
-                <h3>Sala: {rooms.find(r => r.id === currentRoom)?.name}</h3>
-                <p>Integrantes online: {members.length}</p>
-                <ul className="member-list">
-                    {members.map(m => (
-                        <li key={m.user_id}>{m.user_id === user.id ? 'Tú (Online)' : `Usuario: ${m.user_id.slice(0, 8)}...`}</li>
-                    ))}
-                </ul>
-                <button className="primary" onClick={() => setCurrentRoom(null)}>Salir de Sala</button>
-            </div>
-        )
-    }
-
     return (
-        <div className="card room-manager">
-            <h3>Salas Disponibles</h3>
-            <div className="create-room">
-                <input
-                    type="text"
-                    placeholder="Nombre de la sala"
-                    value={newRoomName}
-                    onChange={(e) => setNewRoomName(e.target.value)}
-                />
-                <button className="primary" onClick={createRoom} disabled={loading}>
-                    {loading ? '...' : 'Crear'}
-                </button>
-            </div>
+        <div className="room-container">
+            <AnimatePresence mode="wait">
+                {currentRoom ? (
+                    <motion.div
+                        key="detail"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        className="card room-detail-card"
+                    >
+                        <header className="room-detail-header">
+                            <button className="back-btn" onClick={() => setCurrentRoom(null)}>
+                                <ArrowLeft size={18} />
+                            </button>
+                            <div className="title-group">
+                                <Hash size={16} className="hash-icon" />
+                                <h3>{rooms.find(r => r.id === currentRoom)?.name}</h3>
+                            </div>
+                        </header>
 
-            <div className="room-list">
-                {rooms.length === 0 ? <p>No hay salas. ¡Crea una!</p> : (
-                    rooms.map(room => (
-                        <div key={room.id} className="room-item">
-                            <span>{room.name}</span>
-                            <button className="link-button" onClick={() => joinRoom(room.id)}>Unirse</button>
+                        <div className="room-stats">
+                            <Users size={16} />
+                            <span>{members.length} integrantes activos</span>
                         </div>
-                    ))
+
+                        <div className="member-scroll-area">
+                            <ul className="member-list">
+                                {members.map(m => (
+                                    <motion.li
+                                        initial={{ opacity: 0, y: 5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        key={m.user_id}
+                                        className={m.user_id === user.id ? 'current-user' : ''}
+                                    >
+                                        <div className="member-avatar">
+                                            {m.user_id === user.id ? 'Tú' : 'U'}
+                                        </div>
+                                        <span>{m.user_id === user.id ? 'Tú (En línea)' : `Usuario ${m.user_id.slice(0, 8)}`}</span>
+                                        <div className="indicator-dot"></div>
+                                    </motion.li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className="room-actions">
+                            <button className="primary outline" onClick={() => setCurrentRoom(null)}>
+                                <DoorOpen size={18} />
+                                <span>Salir de la sala</span>
+                            </button>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="list"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="card room-list-card"
+                    >
+                        <div className="list-header">
+                            <div className="icon-title">
+                                <MessageSquare size={20} className="header-icon" />
+                                <h3>Salas Disponibles</h3>
+                            </div>
+                        </div>
+
+                        <div className="create-room-form">
+                            <div className="input-with-icon">
+                                <input
+                                    type="text"
+                                    placeholder="Nueva sala fantástica..."
+                                    value={newRoomName}
+                                    onChange={(e) => setNewRoomName(e.target.value)}
+                                />
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="primary-icon-btn"
+                                    onClick={createRoom}
+                                    disabled={loading || !newRoomName}
+                                >
+                                    <Plus size={20} />
+                                </motion.button>
+                            </div>
+                        </div>
+
+                        <div className="room-scroll-area">
+                            {rooms.length === 0 ? (
+                                <div className="empty-rooms">
+                                    <Hash size={32} />
+                                    <p>No hay salas disponibles. ¡Sé el primero en crear una!</p>
+                                </div>
+                            ) : (
+                                <div className="room-grid">
+                                    {rooms.map(room => (
+                                        <motion.div
+                                            key={room.id}
+                                            className="room-card-item"
+                                            whileHover={{ scale: 1.02 }}
+                                        >
+                                            <div className="room-info">
+                                                <span className="room-name">{room.name}</span>
+                                                <span className="room-id">#{room.id.slice(0, 4)}</span>
+                                            </div>
+                                            <button className="join-btn" onClick={() => joinRoom(room.id)}>
+                                                <LogIn size={16} />
+                                                <span>Unirse</span>
+                                            </button>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
                 )}
-            </div>
+            </AnimatePresence>
         </div>
     )
 }
