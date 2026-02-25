@@ -107,10 +107,14 @@ export default function RoomManager({ user }) {
                 .upsert({ room_id: roomId, user_id: user.id })
 
             if (error) {
-                if (error.code === '23503') {
+                // Ignore unique constraint violation (already a member)
+                if (error.code === '23505') {
+                    console.log('Usuario ya es miembro de esta sala, procediendo...');
+                } else if (error.code === '23503') {
                     throw new Error('No se pudo vincular tu perfil a la sala. Intenta recargar la página.')
+                } else {
+                    throw error
                 }
-                throw error
             }
 
             setCurrentRoom(roomId)
