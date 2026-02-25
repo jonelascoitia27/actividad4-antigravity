@@ -617,24 +617,24 @@ button.primary:disabled {
 }
 
 .btn-kick {
-    background: rgba(239, 68, 68, 0.05);
+    background: rgba(239, 68, 68, 0.1);
     color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.1);
-    padding: 4px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    padding: 6px 10px;
     border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    opacity: 0.6;
+    font-weight: 600;
 }
 
 .btn-kick:hover {
     background: var(--danger);
     color: white;
-    opacity: 1;
-    transform: scale(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* Matching Enhancements */

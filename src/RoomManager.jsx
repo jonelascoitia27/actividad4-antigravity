@@ -23,15 +23,30 @@ export default function RoomManager({ user }) {
     useEffect(() => {
         fetchRooms()
 
+        // Cleanup al cerrar la pestaña o navegar fuera
+        const handleUnload = async () => {
+            if (currentRoom) {
+                await supabase
+                    .from('room_members')
+                    .delete()
+                    .eq('room_id', currentRoom)
+                    .eq('user_id', user.id)
+            }
+        }
+
+        window.addEventListener('beforeunload', handleUnload)
+
         const subscription = supabase
             .channel('public:rooms')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rooms' }, payload => {
-                setRooms(prev => [payload.new, ...prev])
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, fetchRooms)
             .subscribe()
 
-        return () => subscription.unsubscribe()
-    }, [])
+        return () => {
+            window.removeEventListener('beforeunload', handleUnload)
+            handleUnload() // También al desmontar el componente
+            subscription.unsubscribe()
+        }
+    }, [currentRoom, user.id])
 
     /**
      * Obtiene todas las salas disponibles ordenadas por fecha de creación.
@@ -197,11 +212,15 @@ export default function RoomManager({ user }) {
                 table: 'room_members',
                 filter: `room_id=eq.${roomId}`
             }, (payload) => {
-                // Si el evento es un DELETE y el usuario eliminado es el actual, sacarlo
-                if (payload.eventType === 'DELETE' && payload.old.user_id === user.id) {
-                    setCurrentRoom(null)
-                    return
+                // SI ALGUIEN FUE ELIMINADO (LEAVE o KICK)
+                if (payload.eventType === 'DELETE') {
+                    // Si el usuario eliminado soy YO, me saca de la sala
+                    if (payload.old.user_id === user.id) {
+                        setCurrentRoom(null)
+                        return
+                    }
                 }
+                // Recargar lista para todos los demás cambios
                 fetchMembers()
             })
             .on('postgres_changes', {
@@ -307,10 +326,16 @@ export default function RoomManager({ user }) {
                                             {rooms.find(r => r.id === currentRoom)?.created_by === user.id && m.user_id !== user.id && (
                                                 <button
                                                     className="btn-kick"
-                                                    onClick={() => kickUser(m.user_id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        if (window.confirm(`¿Expulsar a ${m.profiles?.username || 'este usuario'}?`)) {
+                                                            kickUser(m.user_id)
+                                                        }
+                                                    }}
                                                     title="Expulsar de la sala"
                                                 >
-                                                    <UserX size={14} />
+                                                    <UserX size={16} />
+                                                    <span style={{ fontSize: '10px', marginLeft: '4px' }}>Echar</span>
                                                 </button>
                                             )}
                                             <div className="indicator-dot"></div>

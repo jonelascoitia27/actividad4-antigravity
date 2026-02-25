@@ -65,14 +65,33 @@ export default function MatchingSystem({ user }) {
         setLoading(true)
         setError(null)
         try {
-            const { data, error: fetchError } = await supabase
+            // 1. Obtener IDs con los que ya se interactuó (LIKE o DISLIKE)
+            const { data: interactedData } = await supabase
+                .from('matches')
+                .select('user_a, user_b')
+                .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+
+            const interactedIds = new Set()
+            interactedData?.forEach(m => {
+                interactedIds.add(m.user_a)
+                interactedIds.add(m.user_b)
+            })
+
+            // 2. Buscar perfiles excluyendo al actual y a los interactuados
+            let query = supabase
                 .from('profiles')
                 .select('*')
                 .neq('id', user.id)
-                .limit(10)
+
+            const { data, error: fetchError } = await query.limit(50)
 
             if (fetchError) throw fetchError
-            if (data) setPotentialMatches(data)
+
+            // 3. Filtrar localmente para mayor precisión (o usar not in si hay pocos interactuados)
+            if (data) {
+                const filtered = data.filter(p => !interactedIds.has(p.id))
+                setPotentialMatches(filtered)
+            }
         } catch (err) {
             setError('No se pudieron cargar los perfiles. Intenta de nuevo.')
         } finally {
