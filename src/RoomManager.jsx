@@ -95,16 +95,30 @@ export default function RoomManager({ user }) {
     }
 
     const joinRoom = async (roomId) => {
+        setLoading(true)
         setError(null)
-        const { error } = await supabase
-            .from('room_members')
-            .upsert({ room_id: roomId, user_id: user.id })
+        try {
+            // 1. Ensure profile exists before joining
+            await ensureProfileExists()
 
-        if (!error) {
+            // 2. Attempt to join
+            const { error } = await supabase
+                .from('room_members')
+                .upsert({ room_id: roomId, user_id: user.id })
+
+            if (error) {
+                if (error.code === '23503') {
+                    throw new Error('No se pudo vincular tu perfil a la sala. Intenta recargar la página.')
+                }
+                throw error
+            }
+
             setCurrentRoom(roomId)
             subscribeToMembers(roomId)
-        } else {
-            setError('Error al unirse a la sala.')
+        } catch (err) {
+            setError(err.message || 'Error al unirse a la sala.')
+        } finally {
+            setLoading(false)
         }
     }
 
