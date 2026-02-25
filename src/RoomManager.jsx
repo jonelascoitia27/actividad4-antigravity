@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare, AlertCircle } from 'lucide-react'
+import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare, AlertCircle, Trash2 } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
 /**
@@ -118,6 +118,37 @@ export default function RoomManager({ user }) {
      * 
      * @param {string} roomId - ID de la sala a la que unirse.
      */
+    /**
+     * Elimina una sala y todos sus registros asociados.
+     * Solo permitido para el creador de la sala.
+     * 
+     * @param {string} roomId - ID de la sala a eliminar.
+     */
+    const deleteRoom = async (roomId) => {
+        if (!window.confirm('¿Estás seguro de que quieres eliminar esta sala? Esta acción no se puede deshacer.')) return
+
+        setLoading(true)
+        setError(null)
+        try {
+            const { error: deleteError } = await supabase
+                .from('rooms')
+                .delete()
+                .eq('id', roomId)
+                .eq('created_by', user.id)
+
+            if (deleteError) throw deleteError
+
+            if (currentRoom === roomId) {
+                setCurrentRoom(null)
+            }
+            fetchRooms()
+        } catch (err) {
+            setError('No tienes permisos o hubo un error al eliminar la sala.')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const joinRoom = async (roomId) => {
         setLoading(true)
         setError(null)
@@ -154,7 +185,7 @@ export default function RoomManager({ user }) {
             .eq('room_id', roomId)
             .then(({ data }) => setMembers(data || []))
 
-        supabase
+        const membersChannel = supabase
             .channel(`room:${roomId}`)
             .on('postgres_changes', {
                 event: '*',
@@ -168,7 +199,19 @@ export default function RoomManager({ user }) {
                     .eq('room_id', roomId)
                     .then(({ data }) => setMembers(data || []))
             })
+            .on('postgres_changes', {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'rooms',
+                filter: `id=eq.${roomId}`
+            }, () => {
+                // Si la sala es eliminada, sacar al usuario
+                setCurrentRoom(null)
+            })
             .subscribe()
+
+        // El canal se cerrará automáticamente si el componente se desmonta o cambia el canal
+        // En una implementación más compleja usaríamos un ref para el canal
     }
 
     return (
@@ -295,10 +338,24 @@ export default function RoomManager({ user }) {
                                                 <span className="room-name">{room.name}</span>
                                                 <span className="room-id">#{room.id.slice(0, 4)}</span>
                                             </div>
-                                            <button className="join-btn" onClick={() => joinRoom(room.id)}>
-                                                <LogIn size={16} />
-                                                <span>Unirse</span>
-                                            </button>
+                                            <div className="room-actions-group" style={{ display: 'flex', gap: '8px' }}>
+                                                {room.created_by === user.id && (
+                                                    <button
+                                                        className="btn-delete"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            deleteRoom(room.id)
+                                                        }}
+                                                        title="Eliminar Sala"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                )}
+                                                <button className="join-btn" onClick={() => joinRoom(room.id)}>
+                                                    <LogIn size={16} />
+                                                    <span>Unirse</span>
+                                                </button>
+                                            </div>
                                         </motion.div>
                                     ))}
                                 </div>

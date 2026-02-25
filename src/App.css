@@ -597,6 +597,25 @@ button.primary:disabled {
     border-color: var(--primary);
 }
 
+.btn-delete {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    padding: 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-delete:hover {
+    background: var(--danger);
+    color: white;
+    transform: scale(1.05);
+}
+
 /* Matching Enhancements */
 .profile-image-section {
     position: relative;
