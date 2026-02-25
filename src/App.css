@@ -793,3 +793,175 @@ button.primary:disabled {
     align-items: center;
     gap: 12px;
 }
+
+/* ── Sync badge (RoomManager header) ───────────────────────────── */
+.sync-badge {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1px solid;
+    transition: all 0.3s ease;
+}
+
+.sync-badge.connected {
+    color: var(--success);
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(16, 185, 129, 0.07);
+}
+
+.sync-badge.syncing {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.3);
+    background: rgba(251, 191, 36, 0.07);
+    animation: pulse-badge 1s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ── Empty-state action buttons ────────────────────────────────── */
+.empty-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin-top: 24px;
+}
+
+.empty-actions button {
+    width: 100%;
+    max-width: 320px;
+}
+
+/* ── Demo button (empty state) ─────────────────────────────────── */
+.demo-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px dashed rgba(129, 140, 248, 0.4) !important;
+    color: var(--primary) !important;
+    background: rgba(129, 140, 248, 0.06) !important;
+    transition: all 0.2s ease;
+}
+
+.demo-btn:hover:not(:disabled) {
+    border-color: var(--primary) !important;
+    background: rgba(129, 140, 248, 0.15) !important;
+}
+
+.demo-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Demo button (inline in matching footer) ───────────────────── */
+.demo-btn-inline {
+    background: rgba(129, 140, 248, 0.08);
+    border: 1px dashed rgba(129, 140, 248, 0.3);
+    color: var(--primary);
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+    margin-top: 8px;
+}
+
+.demo-btn-inline:hover:not(:disabled) {
+    background: rgba(129, 140, 248, 0.2);
+    border-color: var(--primary);
+}
+
+.demo-btn-inline:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Matching footer — row layout ──────────────────────────────── */
+.matching-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* ── Link button (Auth) ────────────────────────────────────────── */
+.link-button {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* ── Secondary outline button ──────────────────────────────────── */
+button.secondary.outline {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button.secondary.outline:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: white;
+}
+
+/* ── Auth card max width ───────────────────────────────────────── */
+.auth-card {
+    max-width: 480px;
+    width: 100%;
+}
+
+/* ── btn-content flex alignment ───────────────────────────────── */
+.btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* ── Empty rooms placeholder ───────────────────────────────────── */
+.empty-rooms {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}

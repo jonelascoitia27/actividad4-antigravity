@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, X, RefreshCw, Star, Info, AlertCircle } from 'lucide-react'
+import { Heart, X, RefreshCw, Star, Info, AlertCircle, Zap } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
 /**
  * Componente que gestiona el sistema de emparejamiento (swipe cards).
  * Permite a los usuarios ver perfiles, dar "like" o "dislike" y detectar matches.
- * 
+ *
  * @component
  * @param {Object} props
  * @param {Object} props.user - El objeto de sesión del usuario actual.
@@ -16,15 +16,14 @@ export default function MatchingSystem({ user }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     const [matchNotification, setMatchNotification] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [generating, setGenerating] = useState(false)
     const [error, setError] = useState(null)
 
     useEffect(() => {
         init()
     }, [])
 
-    /**
-     * Inicializa el sistema cargando perfiles.
-     */
+    /** Inicializa el sistema cargando perfiles. */
     const init = async () => {
         try {
             await fetchPotentialMatches()
@@ -34,9 +33,7 @@ export default function MatchingSystem({ user }) {
         }
     }
 
-    /**
-     * Asegura que el usuario tenga un perfil creado antes de interactuar.
-     */
+    /** Asegura que el usuario tenga un perfil creado antes de interactuar. */
     const ensureProfileExists = async () => {
         const { data: profile } = await supabase
             .from('profiles')
@@ -53,20 +50,15 @@ export default function MatchingSystem({ user }) {
                     username: username,
                     bio: '¡Hola! Estoy buscando matches.'
                 })
-
             if (createError) throw new Error('No se pudo inicializar tu perfil.')
         }
     }
 
-    /**
-     * Obtiene una lista de perfiles potenciales (excluyendo al usuario actual).
-     */
+    /** Obtiene una lista de perfiles potenciales (excluyendo al usuario actual y ya matcheados). */
     const fetchPotentialMatches = async () => {
         setLoading(true)
         setError(null)
         try {
-            // 1. Obtener IDs con los que ya se interactuó (SOLO MATCHES REALES)
-            // Para un proyecto pequeño, permitimos volver a ver gente si no hubo match
             const { data: matchedData } = await supabase
                 .from('matches')
                 .select('user_a, user_b')
@@ -79,7 +71,6 @@ export default function MatchingSystem({ user }) {
                 matchedIds.add(m.user_b)
             })
 
-            // 2. Buscar perfiles
             const { data, error: fetchError } = await supabase
                 .from('profiles')
                 .select('*')
@@ -88,7 +79,6 @@ export default function MatchingSystem({ user }) {
 
             if (fetchError) throw fetchError
 
-            // 3. Filtrar solo los que ya son MATCH (permitimos re-swipear otros para demos)
             if (data) {
                 const filtered = data.filter(p => !matchedIds.has(p.id))
                 setPotentialMatches(filtered)
@@ -100,9 +90,7 @@ export default function MatchingSystem({ user }) {
         }
     }
 
-    /**
-     * Escucha en tiempo real si el usuario recibe un match.
-     */
+    /** Escucha en tiempo real si el usuario recibe un match. */
     const subscribeToMatches = () => {
         supabase
             .channel('my_matches')
@@ -113,22 +101,51 @@ export default function MatchingSystem({ user }) {
                 filter: `user_b=eq.${user.id}`
             }, payload => {
                 if (payload.new.status === 'matched') {
-                    setMatchNotification(`¡Nuevo Match detectado!`)
+                    setMatchNotification('¡Nuevo Match detectado!')
                 }
             })
             .subscribe()
     }
 
     /**
+     * Genera 5 perfiles demo en Supabase para poblar el pool de matching al instante.
+     * Usa crypto.randomUUID() para IDs únicos y upsert para evitar duplicados.
+     */
+    const generateDemoUsers = async () => {
+        setGenerating(true)
+        setError(null)
+        const demoProfiles = [
+            { id: crypto.randomUUID(), username: 'Alex Ramírez', bio: '☕ Amante del café y los atardeceres.' },
+            { id: crypto.randomUUID(), username: 'Sofía Torres', bio: '🎸 Músico en busca de aventuras.' },
+            { id: crypto.randomUUID(), username: 'Carlos Vega', bio: '🌿 Vegano, viajero y soñador.' },
+            { id: crypto.randomUUID(), username: 'Luna Mendoza', bio: '📚 Lectora empedernida y cinéfila.' },
+            { id: crypto.randomUUID(), username: 'Diego Ríos', bio: '🏄 Surfista de corazón y alma libre.' },
+        ]
+
+        try {
+            const { error: insertError } = await supabase
+                .from('profiles')
+                .upsert(demoProfiles)
+
+            if (insertError) throw insertError
+
+            setCurrentIndex(0)
+            await fetchPotentialMatches()
+        } catch (err) {
+            setError('No se pudieron generar usuarios demo. Verifica los permisos de la base de datos.')
+        } finally {
+            setGenerating(false)
+        }
+    }
+
+    /**
      * Gestiona la acción de deslizar (Like/Dislike).
-     * 
      * @param {string} direction - 'right' para Like, 'left' para Dislike.
      * @param {string} targetUserId - ID del usuario al que se le dio swipe.
      */
     const handleSwipe = async (direction, targetUserId) => {
         setError(null)
         try {
-            // Garantizar perfil antes de swipe para evitar FK violations
             await ensureProfileExists()
 
             if (direction === 'right') {
@@ -144,17 +161,13 @@ export default function MatchingSystem({ user }) {
                         .from('matches')
                         .update({ status: 'matched' })
                         .eq('id', existingLike.id)
-
                     if (updError) throw updError
                     setMatchNotification('¡Es un Match Perfecto!')
                 } else {
                     const { error: insError } = await supabase
                         .from('matches')
                         .upsert({ user_a: user.id, user_b: targetUserId, status: 'pending' })
-
-                    if (insError) {
-                        if (insError.code !== '23505') throw insError
-                    }
+                    if (insError && insError.code !== '23505') throw insError
                 }
             }
             setCurrentIndex(prev => prev + 1)
@@ -163,6 +176,7 @@ export default function MatchingSystem({ user }) {
         }
     }
 
+    // ── Loading state ──────────────────────────────────────────────────────────
     if (loading) return (
         <div className="loading-container">
             <RefreshCw className="spinner" />
@@ -179,6 +193,7 @@ export default function MatchingSystem({ user }) {
         </div>
     )
 
+    // ── Empty / out of profiles state ──────────────────────────────────────────
     if (currentIndex >= potentialMatches.length) {
         return (
             <motion.div
@@ -191,24 +206,35 @@ export default function MatchingSystem({ user }) {
                 </div>
                 <h3>¡Eso es todo por ahora!</h3>
                 <p>Has visto todos los perfiles disponibles en tu área.</p>
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="primary"
-                    onClick={() => {
-                        setCurrentIndex(0)
-                        fetchPotentialMatches()
-                    }}
-                >
-                    <RefreshCw size={18} />
-                    <span>Recargar perfiles</span>
-                </motion.button>
+                <div className="empty-actions">
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="primary"
+                        onClick={() => { setCurrentIndex(0); fetchPotentialMatches() }}
+                    >
+                        <RefreshCw size={18} />
+                        <span>Recargar perfiles</span>
+                    </motion.button>
+
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="secondary outline demo-btn"
+                        onClick={generateDemoUsers}
+                        disabled={generating}
+                    >
+                        <Zap size={16} />
+                        <span>{generating ? 'Generando...' : '✨ Generar 5 Usuarios Demo'}</span>
+                    </motion.button>
+                </div>
             </motion.div>
         )
     }
 
     const currentProfile = potentialMatches[currentIndex]
 
+    // ── Main card view ─────────────────────────────────────────────────────────
     return (
         <div className="matching-system">
             <AnimatePresence>
@@ -237,12 +263,12 @@ export default function MatchingSystem({ user }) {
                             opacity: 0,
                             rotate: currentIndex % 2 === 0 ? 20 : -20
                         }}
-                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                         className="swipe-card"
                     >
                         <div className="profile-image-section">
                             <div className="avatar-large">
-                                {currentProfile.username?.[0] || 'U'}
+                                {currentProfile.username?.[0]?.toUpperCase() || 'U'}
                             </div>
                             <div className="profile-info-overlay">
                                 <h3>{currentProfile.username || `Usuario ${currentProfile.id.slice(0, 5)}`}</h3>
@@ -255,7 +281,7 @@ export default function MatchingSystem({ user }) {
 
                         <div className="profile-details">
                             <p className="bio">
-                                <Info size={14} style={{ marginRight: '8px' }} />
+                                <Info size={14} style={{ marginRight: '8px', flexShrink: 0 }} />
                                 {currentProfile.bio || 'Este aventurero aún no ha escrito su biografía.'}
                             </p>
                         </div>
@@ -284,6 +310,17 @@ export default function MatchingSystem({ user }) {
 
             <div className="matching-footer">
                 <p>Perfil {currentIndex + 1} de {potentialMatches.length}</p>
+                <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="demo-btn-inline"
+                    onClick={generateDemoUsers}
+                    disabled={generating}
+                    title="Generar usuarios demo"
+                >
+                    <Zap size={12} />
+                    <span>{generating ? '...' : 'Demos'}</span>
+                </motion.button>
             </div>
         </div>
     )
