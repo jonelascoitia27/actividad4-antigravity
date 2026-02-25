@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare } from 'lucide-react'
+import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare, AlertCircle } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
 export default function RoomManager({ user }) {
@@ -9,6 +9,8 @@ export default function RoomManager({ user }) {
     const [currentRoom, setCurrentRoom] = useState(null)
     const [members, setMembers] = useState([])
     const [loading, setLoading] = useState(false)
+
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         fetchRooms()
@@ -24,30 +26,47 @@ export default function RoomManager({ user }) {
     }, [])
 
     const fetchRooms = async () => {
-        const { data } = await supabase
+        setError(null)
+        const { data, error } = await supabase
             .from('rooms')
             .select('*')
             .order('created_at', { ascending: false })
 
+        if (error) setError('No se pudieron cargar las salas.')
         if (data) setRooms(data)
     }
 
     const createRoom = async () => {
         if (!newRoomName) return
         setLoading(true)
-        const { data, error } = await supabase
-            .from('rooms')
-            .insert([{ name: newRoomName, created_by: user.id }])
-            .select()
+        setError(null)
 
-        if (!error && data) {
-            setNewRoomName('')
-            joinRoom(data[0].id)
+        try {
+            const { data, error } = await supabase
+                .from('rooms')
+                .insert([{ name: newRoomName, created_by: user.id }])
+                .select()
+
+            if (error) {
+                if (error.code === '23505' || error.status === 409) {
+                    throw new Error('Ya existe una sala con ese nombre. Prueba con otro.')
+                }
+                throw error
+            }
+
+            if (data) {
+                setNewRoomName('')
+                joinRoom(data[0].id)
+            }
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     const joinRoom = async (roomId) => {
+        setError(null)
         const { error } = await supabase
             .from('room_members')
             .upsert({ room_id: roomId, user_id: user.id })
@@ -55,6 +74,8 @@ export default function RoomManager({ user }) {
         if (!error) {
             setCurrentRoom(roomId)
             subscribeToMembers(roomId)
+        } else {
+            setError('Error al unirse a la sala.')
         }
     }
 
@@ -103,6 +124,13 @@ export default function RoomManager({ user }) {
                             </div>
                         </header>
 
+                        {error && (
+                            <div className="error-message" style={{ marginBottom: '20px' }}>
+                                <AlertCircle size={14} style={{ marginRight: '8px' }} />
+                                {error}
+                            </div>
+                        )}
+
                         <div className="room-stats">
                             <Users size={16} />
                             <span>{members.length} integrantes activos</span>
@@ -148,6 +176,18 @@ export default function RoomManager({ user }) {
                                 <h3>Salas Disponibles</h3>
                             </div>
                         </div>
+
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                className="error-message"
+                                style={{ marginBottom: '20px' }}
+                            >
+                                <AlertCircle size={14} style={{ marginRight: '8px' }} />
+                                {error}
+                            </motion.div>
+                        )}
 
                         <div className="create-room-form">
                             <div className="input-with-icon">
