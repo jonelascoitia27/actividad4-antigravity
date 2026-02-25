@@ -36,12 +36,38 @@ export default function RoomManager({ user }) {
         if (data) setRooms(data)
     }
 
+    const ensureProfileExists = async () => {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .single()
+
+        if (!profile) {
+            // Create a basic profile if it doesn't exist
+            const username = user.email ? user.email.split('@')[0] : `user_${user.id.slice(0, 5)}`
+            const { error: createError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    username: username,
+                    bio: '¡Hola! Soy nuevo aquí.'
+                })
+
+            if (createError) throw new Error('No se pudo inicializar tu perfil. Inténtalo de nuevo.')
+        }
+    }
+
     const createRoom = async () => {
         if (!newRoomName) return
         setLoading(true)
         setError(null)
 
         try {
+            // 1. Ensure profile exists to avoid FK violations
+            await ensureProfileExists()
+
+            // 2. Attempt to create the room
             const { data, error } = await supabase
                 .from('rooms')
                 .insert([{ name: newRoomName, created_by: user.id }])
@@ -50,6 +76,9 @@ export default function RoomManager({ user }) {
             if (error) {
                 if (error.code === '23505' || error.status === 409) {
                     throw new Error('Ya existe una sala con ese nombre. Prueba con otro.')
+                }
+                if (error.code === '23503') {
+                    throw new Error('Error de vinculación de perfil. Por favor, recarga la página.')
                 }
                 throw error
             }
