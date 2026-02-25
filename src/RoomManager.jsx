@@ -179,11 +179,15 @@ export default function RoomManager({ user }) {
     }
 
     const subscribeToMembers = (roomId) => {
-        supabase
-            .from('room_members')
-            .select('user_id')
-            .eq('room_id', roomId)
-            .then(({ data }) => setMembers(data || []))
+        const fetchMembers = async () => {
+            const { data } = await supabase
+                .from('room_members')
+                .select('user_id, profiles(username)')
+                .eq('room_id', roomId)
+            setMembers(data || [])
+        }
+
+        fetchMembers()
 
         const membersChannel = supabase
             .channel(`room:${roomId}`)
@@ -193,11 +197,7 @@ export default function RoomManager({ user }) {
                 table: 'room_members',
                 filter: `room_id=eq.${roomId}`
             }, () => {
-                supabase
-                    .from('room_members')
-                    .select('user_id')
-                    .eq('room_id', roomId)
-                    .then(({ data }) => setMembers(data || []))
+                fetchMembers()
             })
             .on('postgres_changes', {
                 event: 'DELETE',
@@ -257,9 +257,13 @@ export default function RoomManager({ user }) {
                                         className={m.user_id === user.id ? 'current-user' : ''}
                                     >
                                         <div className="member-avatar">
-                                            {m.user_id === user.id ? 'Tú' : 'U'}
+                                            {(m.user_id === user.id ? 'Tú' : (m.profiles?.username?.[0] || 'U')).toUpperCase()}
                                         </div>
-                                        <span>{m.user_id === user.id ? 'Tú (En línea)' : `Usuario ${m.user_id.slice(0, 8)}`}</span>
+                                        <span>
+                                            {m.user_id === user.id
+                                                ? 'Tú (En línea)'
+                                                : (m.profiles?.username || `Usuario ${m.user_id.slice(0, 8)}`)}
+                                        </span>
                                         <div className="indicator-dot"></div>
                                     </motion.li>
                                 ))}
