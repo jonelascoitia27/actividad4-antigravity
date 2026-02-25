@@ -6,6 +6,7 @@ import MatchingSystem from './MatchingSystem'
 import './App.css'
 
 function App() {
+    const [session, setSession] = useState(null)
     const [activeTab, setActiveTab] = useState('rooms')
 
     useEffect(() => {
