@@ -211,17 +211,21 @@ export default function RoomManager({ user }) {
                 schema: 'public',
                 table: 'room_members',
                 filter: `room_id=eq.${roomId}`
-            }, (payload) => {
-                // SI ALGUIEN FUE ELIMINADO (LEAVE o KICK)
-                if (payload.eventType === 'DELETE') {
-                    // Si el usuario eliminado soy YO, me saca de la sala
-                    if (payload.old.user_id === user.id) {
-                        setCurrentRoom(null)
-                        return
-                    }
+            }, async () => {
+                // Cada vez que pase algo en la sala, refrescamos
+                const { data } = await supabase
+                    .from('room_members')
+                    .select('user_id, profiles(username)')
+                    .eq('room_id', roomId)
+
+                const currentMembers = data || []
+                setMembers(currentMembers)
+
+                // SI YO YA NO ESTOY EN LA LISTA, ES QUE ME FUÍ O ME ECHARON
+                const isMeStillHere = currentMembers.some(m => m.user_id === user.id)
+                if (!isMeStillHere) {
+                    setCurrentRoom(null)
                 }
-                // Recargar lista para todos los demás cambios
-                fetchMembers()
             })
             .on('postgres_changes', {
                 event: 'DELETE',

@@ -65,31 +65,32 @@ export default function MatchingSystem({ user }) {
         setLoading(true)
         setError(null)
         try {
-            // 1. Obtener IDs con los que ya se interactuó (LIKE o DISLIKE)
-            const { data: interactedData } = await supabase
+            // 1. Obtener IDs con los que ya se interactuó (SOLO MATCHES REALES)
+            // Para un proyecto pequeño, permitimos volver a ver gente si no hubo match
+            const { data: matchedData } = await supabase
                 .from('matches')
                 .select('user_a, user_b')
+                .eq('status', 'matched')
                 .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
 
-            const interactedIds = new Set()
-            interactedData?.forEach(m => {
-                interactedIds.add(m.user_a)
-                interactedIds.add(m.user_b)
+            const matchedIds = new Set()
+            matchedData?.forEach(m => {
+                matchedIds.add(m.user_a)
+                matchedIds.add(m.user_b)
             })
 
-            // 2. Buscar perfiles excluyendo al actual y a los interactuados
-            let query = supabase
+            // 2. Buscar perfiles
+            const { data, error: fetchError } = await supabase
                 .from('profiles')
                 .select('*')
                 .neq('id', user.id)
-
-            const { data, error: fetchError } = await query.limit(50)
+                .limit(50)
 
             if (fetchError) throw fetchError
 
-            // 3. Filtrar localmente para mayor precisión (o usar not in si hay pocos interactuados)
+            // 3. Filtrar solo los que ya son MATCH (permitimos re-swipear otros para demos)
             if (data) {
-                const filtered = data.filter(p => !interactedIds.has(p.id))
+                const filtered = data.filter(p => !matchedIds.has(p.id))
                 setPotentialMatches(filtered)
             }
         } catch (err) {
