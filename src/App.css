@@ -616,6 +616,27 @@ button.primary:disabled {
     transform: scale(1.05);
 }
 
+.btn-kick {
+    background: rgba(239, 68, 68, 0.05);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    padding: 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0.6;
+}
+
+.btn-kick:hover {
+    background: var(--danger);
+    color: white;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
 /* Matching Enhancements */
 .profile-image-section {
     position: relative;

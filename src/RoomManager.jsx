@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare, AlertCircle, Trash2 } from 'lucide-react'
+import { Plus, LogIn, Users, DoorOpen, Hash, ArrowLeft, MessageSquare, AlertCircle, Trash2, UserX } from 'lucide-react'
 import { supabase } from './supabaseClient'
 
 /**
@@ -196,7 +196,12 @@ export default function RoomManager({ user }) {
                 schema: 'public',
                 table: 'room_members',
                 filter: `room_id=eq.${roomId}`
-            }, () => {
+            }, (payload) => {
+                // Si el evento es un DELETE y el usuario eliminado es el actual, sacarlo
+                if (payload.eventType === 'DELETE' && payload.old.user_id === user.id) {
+                    setCurrentRoom(null)
+                    return
+                }
                 fetchMembers()
             })
             .on('postgres_changes', {
@@ -205,13 +210,46 @@ export default function RoomManager({ user }) {
                 table: 'rooms',
                 filter: `id=eq.${roomId}`
             }, () => {
-                // Si la sala es eliminada, sacar al usuario
                 setCurrentRoom(null)
             })
             .subscribe()
+    }
 
-        // El canal se cerrará automáticamente si el componente se desmonta o cambia el canal
-        // En una implementación más compleja usaríamos un ref para el canal
+    /**
+     * Permite al usuario actual salir de la sala de forma voluntaria.
+     */
+    const leaveRoom = async () => {
+        if (!currentRoom) return
+        try {
+            await supabase
+                .from('room_members')
+                .delete()
+                .eq('room_id', currentRoom)
+                .eq('user_id', user.id)
+
+            setCurrentRoom(null)
+        } catch (err) {
+            setCurrentRoom(null)
+        }
+    }
+
+    /**
+     * Permite al creador de la sala expulsar a otro usuario.
+     */
+    const kickUser = async (targetUserId) => {
+        if (!currentRoom) return
+        try {
+            const { error: kickError } = await supabase
+                .from('room_members')
+                .delete()
+                .eq('room_id', currentRoom)
+                .eq('user_id', targetUserId)
+
+            if (kickError) throw kickError
+            // El listener de tiempo real se encargará de actualizar la lista para todos
+        } catch (err) {
+            setError('No se pudo expulsar al usuario.')
+        }
     }
 
     return (
@@ -264,14 +302,26 @@ export default function RoomManager({ user }) {
                                                 ? 'Tú (En línea)'
                                                 : (m.profiles?.username || `Usuario ${m.user_id.slice(0, 8)}`)}
                                         </span>
-                                        <div className="indicator-dot"></div>
+                                        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            {/* Mostrar botón de expulsar si soy el creador de la sala */}
+                                            {rooms.find(r => r.id === currentRoom)?.created_by === user.id && m.user_id !== user.id && (
+                                                <button
+                                                    className="btn-kick"
+                                                    onClick={() => kickUser(m.user_id)}
+                                                    title="Expulsar de la sala"
+                                                >
+                                                    <UserX size={14} />
+                                                </button>
+                                            )}
+                                            <div className="indicator-dot"></div>
+                                        </div>
                                     </motion.li>
                                 ))}
                             </ul>
                         </div>
 
                         <div className="room-actions">
-                            <button className="primary outline" onClick={() => setCurrentRoom(null)}>
+                            <button className="primary outline" onClick={leaveRoom}>
                                 <DoorOpen size={18} />
                                 <span>Salir de la sala</span>
                             </button>
