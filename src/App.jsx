@@ -80,7 +80,7 @@ function App() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 20 }}
-                            className="dashboard"
+                            className="dashboard card dashboard-card"
                         >
                             <div className="tab-navigation">
                                 <button

@@ -180,7 +180,7 @@ export default function RoomManager({ user }) {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
-                        className="card room-detail-card"
+                        className="room-detail-view"
                     >
                         <header className="room-detail-header">
                             <button className="back-btn" onClick={() => setCurrentRoom(null)}>
@@ -236,7 +236,7 @@ export default function RoomManager({ user }) {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
-                        className="card room-list-card"
+                        className="room-list-view"
                     >
                         <div className="list-header">
                             <div className="icon-title">

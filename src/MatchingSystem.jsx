@@ -146,7 +146,7 @@ export default function MatchingSystem({ user }) {
     )
 
     if (error) return (
-        <div className="card error-state">
+        <div className="matching-error-view">
             <AlertCircle color="#ff4d4d" size={48} />
             <h3>Ocurrió un error</h3>
             <p>{error}</p>
@@ -159,7 +159,7 @@ export default function MatchingSystem({ user }) {
             <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="card empty-state"
+                className="matching-empty-view"
             >
                 <div className="empty-icon-wrapper">
                     <Star size={48} className="star-icon" />
@@ -213,7 +213,7 @@ export default function MatchingSystem({ user }) {
                             rotate: currentIndex % 2 === 0 ? 20 : -20
                         }}
                         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                        className="card swipe-card"
+                        className="swipe-card"
                     >
                         <div className="profile-image-section">
                             <div className="avatar-large">
